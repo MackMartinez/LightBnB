@@ -110,8 +110,57 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
  const getAllProperties = (options, limit = 10) => {
+
+  const queryParams = [];
+
+  let queryString = `SELECT properties.*, AVG(property_reviews.rating) AS average_rating
+  FROM properties
+  JOIN property_reviews ON property_id = properties.id
+  `;     
+
+// if city searched, add city to query string
+  if(options.city) {
+    queryParams.push(`%${options.city}%`);
+    queryString += `WHERE city LIKE $${queryParams.length} `;
+  }
+console.log("city added:", queryString);
+console.log("params:", queryParams.length);
+// if owner id, return properties for that owner
+if (options.owner_id) {
+  queryParams.push(`${options.owner_id}`);
+  queryString += `AND owner_id IS $${queryParams.length} `;
+}
+
+// if min price, return properties greater than that price
+if(options.minimum_price_per_night) {
+  let convertToCentsMin = options.minimum_price_per_night * 100;
+  queryParams.push(`${convertToCentsMin}`);
+  queryString += `AND cost_per_night >= $${queryParams.length} `
+}
+
+// if max price, return properties less than that price
+if(options.maximum_price_per_night) {
+  let convertToCentsMax = options.maximum_price_per_night * 100;
+  queryParams.push(`${convertToCentsMax}`);
+  queryString += `AND cost_per_night <= $${queryParams.length} `
+}
+
+queryString += `GROUP BY properties.id `
+
+// if min_rating, return properties greater than that rating
+if(options.minimum_rating) {
+  queryParams.push(`${options.minimum_rating}`);
+  queryString += `HAVING AVG(property_reviews.rating) >= $${queryParams.length}`
+}
+
+console.log("after HAVING line:", queryString);
+// add limit param to query string
+  queryParams.push(limit);
+  queryString += `ORDER BY cost_per_night
+  LIMIT $${queryParams.length};`;
+
   return pool
-    .query(`SELECT * FROM properties LIMIT $1`, [limit])
+    .query(queryString, queryParams)
     .then((result) => {
       console.log(result.rows);
       return result.rows;
