@@ -11,8 +11,10 @@ module.exports = function(router, database) {
 
   router.get('/reservations', (req, res) => {
     const userId = req.session.userId;
+    console.log("userid", userId);
     if (!userId) {
-      res.error("💩");
+      console.log("error");
+      // res.error("💩");
       return;
     }
     database.getAllReservations(userId)
